@@ -1,66 +1,86 @@
 import React from 'react';
 import { useWeatherContext } from '../../context/WeatherContext';
-import { Heart, MapPin, Calendar } from 'lucide-react';
-import { format } from 'date-fns';
+
+const getWindDir = (deg) => {
+  const dirs = ['N','NE','E','SE','S','SW','W','NW'];
+  return dirs[Math.round(deg / 45) % 8];
+};
 
 const CurrentWeather = () => {
-  const { currentWeather, currentLocation, favorites, addFavorite, removeFavorite, loading } = useWeatherContext();
+  const { currentWeather, loading, unit, airPollution } = useWeatherContext();
 
   if (loading || !currentWeather) {
-    return <div className="glass-panel skeleton" style={{ height: '250px' }}></div>;
+    return (
+      <div className="glass-panel current-weather-panel">
+        <div className="skeleton" style={{ height: '120px', borderRadius: '1rem', marginBottom: '1rem' }} />
+        <div className="skeleton" style={{ height: '80px', borderRadius: '1rem', marginBottom: '1rem' }} />
+        <div className="weather-stats-grid">
+          {[1,2,3,4,5,6].map(i => (
+            <div key={i} className="skeleton" style={{ height: '72px', borderRadius: '0.75rem' }} />
+          ))}
+        </div>
+      </div>
+    );
   }
 
-  const isFav = favorites.some(f => f.lat === currentLocation.lat && f.lon === currentLocation.lon);
-
-  const toggleFav = () => {
-    if (isFav) {
-      removeFavorite(currentLocation.lat, currentLocation.lon);
-    } else {
-      addFavorite(currentLocation);
-    }
-  };
-
-  const { weather, main } = currentWeather;
+  const { weather, main, wind, visibility } = currentWeather;
   const condition = weather[0];
   const iconUrl = `https://openweathermap.org/img/wn/${condition.icon}@4x.png`;
-  const currentDate = format(new Date(), 'EEEE, d MMMM yyyy | h:mm a');
+  const tempUnit = unit === 'metric' ? '°C' : '°F';
+  const speedUnit = unit === 'metric' ? 'm/s' : 'mph';
+
+  const aqi = airPollution?.list?.[0]?.main?.aqi;
+  const aqiLabels = { 1: 'Good', 2: 'Fair', 3: 'Moderate', 4: 'Poor', 5: 'Very Poor' };
+  const aqiColors = { 1: '#10b981', 2: '#3b82f6', 3: '#f59e0b', 4: '#f97316', 5: '#ef4444' };
+
+  const uvIndex = 5; // placeholder (requires UV API)
+
+  const stats = [
+    { label: 'Precipitation', value: `${Math.round((currentWeather.rain?.['1h'] || 0) * 100) || Math.round(currentWeather.clouds?.all || 0)}`, unit: '%', sub: null },
+    { label: 'Wind Speed', value: `${wind.speed}`, unit: speedUnit, sub: getWindDir(wind.deg) },
+    { label: 'Humidity', value: `${main.humidity}`, unit: '%', sub: null },
+    { label: 'UV Index', value: `${uvIndex}`, unit: '', sub: 'Moderate' },
+    { label: 'Air Quality', value: aqi ? `${aqi * 10 + 25}` : '—', unit: '', sub: aqi ? aqiLabels[aqi] : '—', subColor: aqi ? aqiColors[aqi] : undefined },
+    { label: 'Pressure', value: `${main.pressure}`, unit: ' hPa', sub: null },
+  ];
 
   return (
-    <div className="glass-panel flex flex-col justify-between" style={{ minHeight: '250px' }}>
-      <div className="flex justify-between items-start">
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <MapPin size={20} className="text-primary" />
-            <h2 className="text-2xl font-bold">{currentLocation.name}</h2>
+    <div className="glass-panel current-weather-panel">
+      {/* Top: icon + basic info */}
+      <div className="current-weather-top">
+        <img
+          src={iconUrl}
+          alt={condition.description}
+          className="current-weather-icon"
+        />
+        <div className="current-weather-info">
+          <div className="current-weather-condition-line">
+            Sun: <span>{Math.round(main.temp_max ?? main.temp)}{tempUnit}</span>
           </div>
-          <div className="flex items-center gap-2 text-sm text-muted">
-            <Calendar size={14} />
-            <p>{currentDate}</p>
+          <div className="current-weather-condition-line">
+            Clouds: <span style={{ textTransform: 'capitalize' }}>{condition.description}</span>
           </div>
+
+          <div className="current-weather-feels">Feels Like {Math.round(main.feels_like)}{tempUnit}</div>
+          <div className="current-weather-temp">{Math.round(main.temp)}{tempUnit}</div>
         </div>
-        
-        <button 
-          className="btn-icon glass-card"
-          onClick={toggleFav}
-          style={{ padding: '0.5rem', borderRadius: '50%' }}
-          title={isFav ? "Remove from favorites" : "Add to favorites"}
-        >
-          <Heart size={20} className={isFav ? "text-danger" : ""} fill={isFav ? "currentColor" : "none"} />
-        </button>
       </div>
 
-      <div className="flex justify-between items-center mt-6">
-        <div className="flex items-center">
-          <h1 className="text-6xl font-bold">{Math.round(main.temp)}°</h1>
-          <div className="ml-4 flex flex-col justify-center">
-            <span className="text-xl font-medium capitalize">{condition.description}</span>
-            <span className="text-sm text-muted">Feels like {Math.round(main.feels_like)}°</span>
+      {/* Stats grid */}
+      <div className="weather-stats-grid">
+        {stats.map((s, i) => (
+          <div key={i} className="stat-card">
+            <div className="stat-label">{s.label}</div>
+            <div className="stat-value">
+              {s.value}<span> {s.unit}</span>
+            </div>
+            {s.sub && (
+              <div className="stat-sub" style={s.subColor ? { color: s.subColor } : {}}>
+                {s.sub}
+              </div>
+            )}
           </div>
-        </div>
-        
-        <div className="hidden sm:block">
-          <img src={iconUrl} alt={condition.description} style={{ width: '120px', height: '120px', filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.2))' }} />
-        </div>
+        ))}
       </div>
     </div>
   );

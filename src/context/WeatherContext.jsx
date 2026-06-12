@@ -48,11 +48,10 @@ export const WeatherProvider = ({ children }) => {
     localStorage.setItem('favorites', JSON.stringify(favorites));
   }, [favorites]);
 
-  // Effect for Geolocation
+  // Effect for Geolocation — geoLoc.name is now the real reverse-geocoded city name
   useEffect(() => {
     if (geoLoc) {
-      // Need to reverse geocode to get name, but weather api will return name
-      fetchWeatherData(geoLoc.lat, geoLoc.lon, 'Current Location');
+      fetchWeatherData(geoLoc.lat, geoLoc.lon, geoLoc.name || null);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [geoLoc]);
@@ -121,12 +120,22 @@ export const WeatherProvider = ({ children }) => {
 
   // Initial load
   useEffect(() => {
-    // If we have a location in state, fetch it
     if (!currentWeather) {
       fetchWeatherData(currentLocation.lat, currentLocation.lon, currentLocation.name);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ── Auto-refresh every 10 minutes (like Google Weather) ─────────────────
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (currentLocation?.lat) {
+        fetchWeatherData(currentLocation.lat, currentLocation.lon, currentLocation.name);
+      }
+    }, 10 * 60 * 1000); // 10 minutes
+    return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentLocation]);
 
   const value = {
     theme,
